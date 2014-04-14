@@ -1,1 +1,3 @@
-module Database.Hasqueue where
+module Database.Hasqueue ( module Export ) where
+
+import Database.Hasqueue.Value as Export
