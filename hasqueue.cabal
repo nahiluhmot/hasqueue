@@ -15,6 +15,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Database.Hasqueue,
+                       Control.Concurrent.STM.Class,
                        Control.Concurrent.STM.TMap
   build-depends:       base >=4.6 && <4.7,
                        mtl ==2.1.*,
