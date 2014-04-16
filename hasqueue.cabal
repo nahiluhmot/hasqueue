@@ -22,7 +22,9 @@ library
                        transformers ==0.3.*,
                        bytestring ==0.10.*,
                        stm ==2.4.3,
-                       containers ==0.5.*
+                       containers ==0.5.*,
+                       pipes ==4.1.*,
+                       pipes-concurrency ==2.0.*
   hs-source-dirs:      src
   ghc-options:         -O3
   default-language:    Haskell2010
