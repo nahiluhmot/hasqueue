@@ -7,8 +7,8 @@ module Database.Hasqueue.Store.Simple ( Simple ) where
 import Control.Monad.Error
 import Control.Monad.State
 import qualified Data.Map as M
-import Database.Hasqueue.Message
-import qualified Database.Hasqueue.Value as V
+import Database.Hasqueue.Core.Message
+import qualified Database.Hasqueue.Core.Value as V
 import Database.Hasqueue.Store.Class
 import Pipes
 
@@ -97,9 +97,6 @@ shutdown = throwError V.ShuttingDown
 
 runSimpleT :: Monad m => SimpleT m a -> Simple -> m (Either V.HasqueueError a, Simple)
 runSimpleT comp world = flip runStateT world $ runErrorT comp
-
-get' :: Monad m => SimpleT m (M.Map V.BucketID Bucket)
-get' = liftM runWorld get
 
 gets' :: Monad m => (M.Map V.BucketID Bucket -> a) -> SimpleT m a
 gets' f = gets (f . runWorld)

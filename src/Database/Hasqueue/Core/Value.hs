@@ -1,12 +1,12 @@
 -- | This module holds the base data types and functions to interact with
 -- them. This is the lowest-level interface to interact with the datastore.
-module Database.Hasqueue.Value ( -- * Base Types
-                                 BucketID
-                               , ValueID
-                               , Value(..)
-                                 -- * Error
-                               , HasqueueError(..)
-                               ) where
+module Database.Hasqueue.Core.Value ( -- * Base Types
+                                      BucketID
+                                    , ValueID
+                                    , Value(..)
+                                      -- * Error
+                                    , HasqueueError(..)
+                                    ) where
 
 import qualified Control.Monad.Error.Class as E
 import qualified Data.ByteString as B

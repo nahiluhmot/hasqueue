@@ -1,6 +1,8 @@
-module Database.Hasqueue.Message where
+module Database.Hasqueue.Core.Message ( StoreRequest(..)
+                                      , StoreResponse(..)
+                                      ) where
 
-import Database.Hasqueue.Value as V
+import Database.Hasqueue.Core.Value as V
 
 -- | 'StoreRequest's are sent to the persistence layer.
 data StoreRequest = ListBuckets

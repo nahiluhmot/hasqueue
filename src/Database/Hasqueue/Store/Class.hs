@@ -7,8 +7,8 @@ module Database.Hasqueue.Store.Class ( -- * ^ 'Store' Type Class
                                      , StoreOut
                                      ) where
 
-import qualified Database.Hasqueue.Message as M
-import qualified Database.Hasqueue.Value as V
+import qualified Database.Hasqueue.Core.Message as M
+import qualified Database.Hasqueue.Core.Value as V
 import Pipes
 
 -- | A 'Store' is used to actually persist the values in 'Hasqueue'.
