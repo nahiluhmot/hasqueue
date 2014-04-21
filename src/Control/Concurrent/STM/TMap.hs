@@ -16,6 +16,9 @@ module Control.Concurrent.STM.TMap ( -- * Types
                                      -- * List conversions
                                    , fromList
                                    , toList
+                                     -- * Map conversinos
+                                   , fromMap
+                                   , toMap
                                    ) where
 
 import Control.Concurrent.STM
@@ -67,10 +70,10 @@ fromList = fromMap . M.fromList
 toList :: Ord k => TMap k v -> STM [(k, v)]
 toList = liftM M.toList . toMap
 
--- Convert a 'M.Map' into a 'TMap'.
+-- | Convert a 'M.Map' into a 'TMap'.
 fromMap :: M.Map k v -> STM (TMap k v)
 fromMap = newTVar
 
--- Convert a 'TMap' into 'M.Map'.
+-- | Convert a 'TMap' into 'M.Map'.
 toMap :: TMap k v -> STM (M.Map k v)
 toMap = readTVar
