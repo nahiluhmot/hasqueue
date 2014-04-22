@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 -- | This module holds the simplest data store possible -- it uses the
 -- 'StateT' 'Monad' and runs in a single thread.
 module Database.Hasqueue.Store.Simple ( Simple ) where
@@ -8,8 +8,8 @@ import Control.Monad.Error
 import Control.Monad.State
 import qualified Data.Map as M
 import Database.Hasqueue.Core.Message
+import Database.Hasqueue.Core.Service
 import qualified Database.Hasqueue.Core.Value as V
-import Database.Hasqueue.Store.Class
 import Pipes
 
 
@@ -18,19 +18,20 @@ newtype Simple = World { runWorld :: M.Map V.BucketID Bucket }
 type SimpleT m = ErrorT V.HasqueueError (StateT Simple m)
 type Bucket = M.Map V.ValueID V.Value
 
-instance Store Simple where
-    startStore = return $ World M.empty
-    stopStore _ = return ()
-    runStore = runSimpleStore
+instance Service Simple StoreRequest (Either V.HasqueueError StoreResponse) where
+    startService = return $ World M.empty
+    stopService _ = return ()
+    toPipe = runSimpleStore
 
-runSimpleStore :: Simple -> Pipe StoreIn StoreOut IO ()
+runSimpleStore :: Monad m => Simple -> Pipe StoreRequest (Either V.HasqueueError StoreResponse) m ()
 runSimpleStore world = do
     storeIn <- await
-    (result, world') <- lift $ runSimpleT (performOperation storeIn) world
-    yield result
-    unless (result == Left V.ShuttingDown) $ runSimpleStore world'
+    (storeOut, world') <- lift $ runSimpleT (performOperation storeIn) world
+    unless (storeOut == Left V.ShuttingDown) $ do
+        yield storeOut
+        runSimpleStore world'
 
-performOperation :: Monad m => StoreIn -> SimpleT m StoreResponse
+performOperation :: Monad m => StoreRequest -> SimpleT m StoreResponse
 performOperation ListBuckets = liftM Buckets listBuckets
 performOperation (CreateBucket bid) = createBucket bid >> return (Bucket bid)
 performOperation (DeleteBucket bid) = deleteBucket bid >> return Empty
@@ -46,7 +47,7 @@ listBuckets :: Monad m => SimpleT m [V.BucketID]
 listBuckets = gets' M.keys
 
 deleteBucket :: Monad m => V.BucketID -> SimpleT m ()
-deleteBucket bid = modify' $ M.delete bid
+deleteBucket = modify' . M.delete
 
 createBucket :: Monad m => V.BucketID -> SimpleT m ()
 createBucket = flip putBucket M.empty
@@ -59,7 +60,7 @@ getBucket bid = do
         Just bucket -> return bucket
 
 putBucket :: Monad m => V.BucketID -> Bucket -> SimpleT m ()
-putBucket bid bucket = modify' $ M.insert bid bucket
+putBucket bid = modify' . M.insert bid
 
 modifyBucket :: Monad m => V.BucketID -> (Bucket -> Bucket) -> SimpleT m ()
 modifyBucket bid f = getBucket bid >>= putBucket bid . f
@@ -71,7 +72,7 @@ renameBucket old new = do
     putBucket new bucket
 
 listBucket :: Monad m => V.BucketID -> SimpleT m [V.ValueID]
-listBucket bid = liftM M.keys $ getBucket bid
+listBucket = liftM M.keys . getBucket
 
 getValue :: Monad m => V.BucketID -> V.ValueID -> SimpleT m V.Value
 getValue bid vid = do
