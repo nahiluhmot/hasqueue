@@ -21,8 +21,7 @@ data Simple = Simple { storeIn :: Output StoreRequest
                      , close :: STM ()
                      }
 
-newtype SimpleState = World { runWorld :: M.Map V.BucketID Bucket }
-
+type SimpleState = M.Map V.BucketID Bucket
 type SimpleT m = ErrorT V.HasqueueError (StateT SimpleState m)
 type Bucket = M.Map V.ValueID V.Value
 
@@ -31,7 +30,7 @@ instance Service Simple StoreRequest (Either V.HasqueueError StoreResponse) wher
         (o, i, s) <- spawn' Unbounded
         (o', i', s') <- spawn' Unbounded
         tid <- forkIO $ do
-            runEffect $ fromInput i >-> runSimpleStore (World M.empty) >-> toOutput o'
+            runEffect $ fromInput i >-> runSimpleStore M.empty >-> toOutput o'
             performGC
         return $ Simple { storeIn = o
                         , storeOut = i'
@@ -73,23 +72,23 @@ performOperation (RenameValue old new) = renameValue old new >> return Empty
 performOperation Shutdown = shutdown
 
 listBuckets :: Monad m => SimpleT m [V.BucketID]
-listBuckets = gets' M.keys
+listBuckets = gets M.keys
 
 deleteBucket :: Monad m => V.BucketID -> SimpleT m ()
-deleteBucket = modify' . M.delete
+deleteBucket = modify . M.delete
 
 createBucket :: Monad m => V.BucketID -> SimpleT m ()
 createBucket = flip putBucket M.empty
 
 getBucket :: Monad m => V.BucketID -> SimpleT m Bucket
 getBucket bid = do
-    result <- gets' $ M.lookup bid
+    result <- gets $ M.lookup bid
     case result of
         Nothing -> throwError $ V.NoSuchBucket bid
         Just bucket -> return bucket
 
 putBucket :: Monad m => V.BucketID -> Bucket -> SimpleT m ()
-putBucket bid = modify' . M.insert bid
+putBucket bid = modify . M.insert bid
 
 modifyBucket :: Monad m => V.BucketID -> (Bucket -> Bucket) -> SimpleT m ()
 modifyBucket bid f = getBucket bid >>= putBucket bid . f
@@ -127,12 +126,3 @@ shutdown = throwError V.ShuttingDown
 
 runSimpleT :: Monad m => SimpleT m a -> SimpleState -> m (Either V.HasqueueError a, SimpleState)
 runSimpleT comp world = flip runStateT world $ runErrorT comp
-
-gets' :: Monad m => (M.Map V.BucketID Bucket -> a) -> SimpleT m a
-gets' f = gets (f . runWorld)
-
-put' :: Monad m => M.Map V.BucketID Bucket -> SimpleT m ()
-put' = put . World
-
-modify' :: Monad m => (M.Map V.BucketID Bucket -> M.Map V.BucketID Bucket) -> SimpleT m ()
-modify' f = gets' f >>= put'
