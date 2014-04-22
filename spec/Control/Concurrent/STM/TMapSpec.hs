@@ -8,23 +8,23 @@ import Test.Hspec
 
 spec :: Spec
 spec = do
-    describe "newTMap" $ do
+    describe "newTMap" $
         it "creates a new empty TMap" $ do
             isEmpty <- atomically $ newTMap >>= null
             unless isEmpty $ fail "TMap is not empty."
 
-    describe "newTMapIO" $ do
+    describe "newTMapIO" $
         it "creates a new empty TMap" $ do
             isEmpty <- newTMapIO >>= atomically . null
             unless isEmpty $ fail "TMap is not empty."
 
     describe "size" $ do
-        context "when the TMap is empty" $ do
+        context "when the TMap is empty" $
             it "returns 0" $ do
                 elems <- atomically $ newTMap >>= size
                 elems `shouldBe` 0
 
-        context "when the TMap is not empty" $ do
+        context "when the TMap is not empty" $
             it "returns the size" $ do
                 elems <- atomically $ do
                     tmap <- newTMap
@@ -34,12 +34,12 @@ spec = do
                 elems `shouldBe` 2
 
     describe "null" $ do
-        context "when the TMap is empty" $ do
+        context "when the TMap is empty" $
             it "returns True" $ do
                 isEmpty <- atomically $ newTMap >>= null
                 unless isEmpty $ fail "TMap is not empty."
 
-        context "when the TMap is not empty" $ do
+        context "when the TMap is not empty" $
             it "returns False" $ do
                 isEmpty <- atomically $ do
                     tmap <- newTMap
@@ -48,13 +48,13 @@ spec = do
                 when isEmpty $ fail "TMap is empty."
 
     describe "lookup" $ do
-        context "when the key is not in the TMap" $ do
+        context "when the key is not in the TMap" $
             it "returns Nothing" $ do
                 result <- atomically $
                     (newTMap :: STM (TMap String ())) >>= lookup "key"
                 result `shouldBe` Nothing
 
-        context "when the key is in the TMap" $ do
+        context "when the key is in the TMap" $
             it "returns the associated value" $ do
                 result <- atomically $ do
                     tmap <- newTMap
@@ -62,7 +62,7 @@ spec = do
                     lookup "test" tmap
                 result `shouldBe` Just 15
 
-    describe "keys" $ do
+    describe "keys" $
         it "returns each key in the TMap" $ do
             keys' <- atomically $ do
                 tmap <- newTMap
@@ -72,7 +72,7 @@ spec = do
                 keys tmap
             keys' `shouldBe` "abc"
 
-    describe "insert" $ do
+    describe "insert" $
         it "inserts a value into the TMap" $ do
             tmap <- newTMapIO
             firstLookup <- atomically $ lookup "15" tmap
@@ -82,7 +82,7 @@ spec = do
             secondLookup `shouldBe` Just '8'
 
     describe "delete" $ do
-        context "when the key does not exist in the TMap" $ do
+        context "when the key does not exist in the TMap" $
             it "does not modify the TMap" $ do
                 tmap <- atomically $ do
                     tmap' <- newTMap
@@ -94,7 +94,7 @@ spec = do
                 map'' <- atomically $ toMap tmap
                 map' `shouldBe` map''
 
-        context "when the key does exist in the TMap" $ do
+        context "when the key does exist in the TMap" $
             it "does not modify the TMap" $ do
                 tmap <- atomically $ do
                     tmap' <- newTMap
