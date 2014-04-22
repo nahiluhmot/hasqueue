@@ -4,6 +4,8 @@
 -- 'StateT' 'Monad' and runs in a single thread.
 module Database.Hasqueue.Store.Simple ( Simple ) where
 
+import Control.Concurrent hiding (yield)
+import Control.Concurrent.STM.Class
 import Control.Monad.Error
 import Control.Monad.State
 import qualified Data.Map as M
@@ -11,24 +13,51 @@ import Database.Hasqueue.Core.Message
 import Database.Hasqueue.Core.Service
 import qualified Database.Hasqueue.Core.Value as V
 import Pipes
+import Pipes.Concurrent
 
+data Simple = Simple { storeIn :: Output StoreRequest
+                     , storeOut :: Input (Either V.HasqueueError StoreResponse)
+                     , threadId :: ThreadId
+                     , close :: STM ()
+                     }
 
-newtype Simple = World { runWorld :: M.Map V.BucketID Bucket }
+newtype SimpleState = World { runWorld :: M.Map V.BucketID Bucket }
 
-type SimpleT m = ErrorT V.HasqueueError (StateT Simple m)
+type SimpleT m = ErrorT V.HasqueueError (StateT SimpleState m)
 type Bucket = M.Map V.ValueID V.Value
 
 instance Service Simple StoreRequest (Either V.HasqueueError StoreResponse) where
-    startService = return $ World M.empty
-    stopService _ = return ()
-    toPipe = runSimpleStore
+    startService = do
+        (o, i, s) <- spawn' Unbounded
+        (o', i', s') <- spawn' Unbounded
+        tid <- forkIO $ do
+            runEffect $ fromInput i >-> runSimpleStore (World M.empty) >-> toOutput o'
+            performGC
+        return $ Simple { storeIn = o
+                        , storeOut = i'
+                        , threadId = tid
+                        , close = s >> s'
+                        }
+    stopService simple = do
+        liftSTM $ close simple
+        killThread $ threadId simple
+    toPipe s@(Simple i o _ _) = do
+        input <- await
+        isAlive <- liftSTM $ send i input
+        when isAlive $ do
+            output <- liftSTM $ recv o
+            case output of
+                Nothing -> return ()
+                Just value -> do
+                    yield value
+                    toPipe s
 
-runSimpleStore :: Monad m => Simple -> Pipe StoreRequest (Either V.HasqueueError StoreResponse) m ()
+runSimpleStore :: Monad m => SimpleState -> Pipe StoreRequest (Either V.HasqueueError StoreResponse) m ()
 runSimpleStore world = do
-    storeIn <- await
-    (storeOut, world') <- lift $ runSimpleT (performOperation storeIn) world
-    unless (storeOut == Left V.ShuttingDown) $ do
-        yield storeOut
+    input <- await
+    (output, world') <- lift $ runSimpleT (performOperation input) world
+    unless (output == Left V.ShuttingDown) $ do
+        yield output
         runSimpleStore world'
 
 performOperation :: Monad m => StoreRequest -> SimpleT m StoreResponse
@@ -96,7 +125,7 @@ renameValue old new = do
 shutdown :: Monad m => SimpleT m a
 shutdown = throwError V.ShuttingDown
 
-runSimpleT :: Monad m => SimpleT m a -> Simple -> m (Either V.HasqueueError a, Simple)
+runSimpleT :: Monad m => SimpleT m a -> SimpleState -> m (Either V.HasqueueError a, SimpleState)
 runSimpleT comp world = flip runStateT world $ runErrorT comp
 
 gets' :: Monad m => (M.Map V.BucketID Bucket -> a) -> SimpleT m a
