@@ -36,7 +36,6 @@ data HasqueueError = InternalError B.ByteString
                    | BucketExists BucketID
                    | NoSuchBucket BucketID
                    | NoSuchValue BucketID ValueID
-                   | ShuttingDown
                    deriving (Eq, Show)
 
 instance E.Error HasqueueError where

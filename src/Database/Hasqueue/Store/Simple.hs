@@ -55,9 +55,8 @@ runSimpleStore :: Monad m => SimpleState -> Pipe StoreRequest (Either V.Hasqueue
 runSimpleStore world = do
     input <- await
     (output, world') <- lift $ runSimpleT (performOperation input) world
-    unless (output == Left V.ShuttingDown) $ do
-        yield output
-        runSimpleStore world'
+    yield output
+    runSimpleStore world'
 
 performOperation :: Monad m => StoreRequest -> SimpleT m StoreResponse
 performOperation ListBuckets = liftM Buckets listBuckets
@@ -69,7 +68,6 @@ performOperation (GetValue bid vid) = liftM Value $ getValue bid vid
 performOperation (DeleteValue bid vid) = deleteValue bid vid >> return Empty
 performOperation (PutValue bid vid val) = putValue bid vid val >> return Empty
 performOperation (RenameValue old new) = renameValue old new >> return Empty
-performOperation Shutdown = shutdown
 
 listBuckets :: Monad m => SimpleT m [V.BucketID]
 listBuckets = gets M.keys
@@ -120,9 +118,6 @@ renameValue old new = do
     value <- uncurry getValue old
     uncurry deleteValue old
     uncurry putValue new value
-
-shutdown :: Monad m => SimpleT m a
-shutdown = throwError V.ShuttingDown
 
 runSimpleT :: Monad m => SimpleT m a -> SimpleState -> m (Either V.HasqueueError a, SimpleState)
 runSimpleT comp world = flip runStateT world $ runErrorT comp

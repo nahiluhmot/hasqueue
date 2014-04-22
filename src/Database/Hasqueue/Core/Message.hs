@@ -14,7 +14,6 @@ data StoreRequest = ListBuckets
                   | DeleteValue V.BucketID V.ValueID
                   | PutValue V.BucketID V.ValueID V.Value
                   | RenameValue (V.BucketID, V.ValueID) (V.BucketID, V.ValueID)
-                  | Shutdown
                   deriving (Eq, Show)
 
 -- | 'StoreResponse's are returned by the persistence layer.
