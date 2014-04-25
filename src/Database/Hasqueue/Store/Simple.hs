@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+
 -- | This module holds the simplest data store possible -- it uses the
 -- 'StateT' 'Monad' and runs in a single thread.
 module Database.Hasqueue.Store.Simple ( Simple ) where
@@ -17,30 +18,25 @@ import Pipes.Concurrent
 
 data Simple = Simple { storeIn :: Output StoreRequest
                      , storeOut :: Input (Either V.HasqueueError StoreResponse)
-                     , threadId :: ThreadId
                      , close :: STM ()
                      }
 
+type Bucket = M.Map V.ValueID V.Value
 type SimpleState = M.Map V.BucketID Bucket
 type SimpleT m = ErrorT V.HasqueueError (StateT SimpleState m)
-type Bucket = M.Map V.ValueID V.Value
 
 instance Service Simple StoreRequest (Either V.HasqueueError StoreResponse) where
     startService = do
-        (o, i, s) <- spawn' Unbounded
-        (o', i', s') <- spawn' Unbounded
-        tid <- forkIO $ do
-            runEffect $ fromInput i >-> runSimpleStore M.empty >-> toOutput o'
+        (i, o, s) <- spawn' Unbounded
+        (i', o', s') <- spawn' Unbounded
+        _ <- forkIO $ do
+            putStrLn "starting db"
+            runEffect $ fromInput o >-> runSimpleStore M.empty >-> toOutput i'
+            putStrLn "stopping db"
             performGC
-        return $ Simple { storeIn = o
-                        , storeOut = i'
-                        , threadId = tid
-                        , close = s >> s'
-                        }
-    stopService simple = do
-        liftSTM $ close simple
-        killThread $ threadId simple
-    toPipe s@(Simple i o _ _) = do
+        return Simple { storeIn = i, storeOut = o', close = s >> s' }
+    stopService = liftSTM . close
+    toPipe s@(Simple i o _) = do
         input <- await
         isAlive <- liftSTM $ send i input
         when isAlive $ do
@@ -76,7 +72,10 @@ deleteBucket :: Monad m => V.BucketID -> SimpleT m ()
 deleteBucket = modify . M.delete
 
 createBucket :: Monad m => V.BucketID -> SimpleT m ()
-createBucket = flip putBucket M.empty
+createBucket bid = do
+    bucketExists <- gets $ M.member bid
+    when bucketExists . throwError $ V.BucketExists bid
+    putBucket bid M.empty
 
 getBucket :: Monad m => V.BucketID -> SimpleT m Bucket
 getBucket bid = do
@@ -93,6 +92,9 @@ modifyBucket bid f = getBucket bid >>= putBucket bid . f
 
 renameBucket :: Monad m => V.BucketID -> V.BucketID -> SimpleT m ()
 renameBucket old new = do
+    newExists <- gets $ M.member new
+    when newExists $
+        throwError $ V.BucketExists new
     bucket <- getBucket old
     deleteBucket old
     putBucket new bucket

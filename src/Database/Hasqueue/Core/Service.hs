@@ -12,5 +12,5 @@ class Service s a b | s -> a b where
     startService :: IO s
     -- | Stop the 'Service'.
     stopService :: s -> IO ()
-    -- | Access a streaming purpose for the 'Service'.
+    -- | Access a streaming interface for the 'Service'.
     toPipe :: s -> Pipe a b IO ()
